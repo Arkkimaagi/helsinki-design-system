@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react';
 
 type FocusableElement = HTMLElement;
 type SelectorResult = FocusableElement | Node | EventTarget;
-type ElementGetter = () => SelectorResult[];
+type ElementGetter = (parent?: FocusableElement, index?: number) => SelectorResult[];
 type ElementSelector = string | ElementGetter;
 type RefListener = (element: HTMLElement) => React.MutableRefObject<HTMLElement | null>;
 type EventListener = (e: Event) => void;
@@ -23,6 +23,14 @@ type Props = {
   forceFocus?: boolean;
   disableOnMultiKeyDown?: boolean;
   onChange?: (type: EventType, element?: HTMLElement) => void;
+  isSubLevelVisible?: (element: FocusableElement, index: number) => boolean;
+};
+type FocusData = {
+  element: SelectorResult;
+  index: number;
+  hasFocus: boolean;
+  subLevel: null | FocusData[];
+  parentData: null | FocusData;
 };
 
 const defaultProps: Props = {
@@ -49,50 +57,90 @@ function forceFocusToElement(element?: SelectorResult) {
     focusableElement.setAttribute('tabindex', '-1');
     focusableElement.focus();
   }
-  return document.activeElement !== element;
+  return document.activeElement === element;
 }
 
+function createFocusData(element: SelectorResult, index: number): FocusData {
+  return {
+    element,
+    index,
+    hasFocus: false,
+    subLevel: null,
+    parentData: null,
+  };
+}
 function createFocusTracker() {
   const loop = true;
-  let currentIndex = -1;
-  let elements: SelectorResult[] = [];
+  let focusedData: FocusData | null = null;
+  let data: FocusData[] = [];
   const getIndex = (dir: 1 | -1) => {
-    if (!elements.length) {
-      currentIndex = -1;
-      return currentIndex;
+    if (!data.length) {
+      focusedData = null;
+      return -1;
+    }
+    if (!focusedData) {
+      return 0;
     }
     if (dir > 0) {
-      if (currentIndex === elements.length - 1 && loop) {
-        currentIndex = 0;
-      } else {
-        currentIndex = Math.min(elements.length - 1, currentIndex + 1);
+      if (focusedData.index === data.length - 1 && loop) {
+        return 0;
       }
-    } else if (currentIndex === 0 && loop) {
-      currentIndex = elements.length - 1;
-    } else {
-      currentIndex = Math.max(0, currentIndex - 1);
+      return Math.min(data.length - 1, focusedData.index + 1);
     }
-    return currentIndex;
+    if (focusedData.index === 0 && loop) {
+      return data.length - 1;
+    }
+    return Math.max(0, focusedData.index - 1);
+  };
+  const setIndex = (index: number) => {
+    if (focusedData) {
+      focusedData.hasFocus = false;
+    }
+    focusedData = data[index];
+    if (!focusedData) {
+      return -1;
+    }
+    focusedData.hasFocus = true;
+    return index;
   };
   return {
     reset: (elementList: SelectorResult[]) => {
-      currentIndex = -1;
-      elements = elementList;
+      focusedData = null;
+      data = elementList.map(createFocusData);
     },
     next: () => {
-      console.log('currentIndex', currentIndex);
-      const index = getIndex(1);
-      console.log('index', index);
-      return forceFocusToElement(elements[index]);
+      const targetData = data[setIndex(getIndex(1))];
+      return forceFocusToElement(targetData.element);
     },
     previous: () => {
-      const index = getIndex(-1);
-      return forceFocusToElement(elements[index]);
+      const targetData = data[setIndex(getIndex(-1))];
+      return forceFocusToElement(targetData.element);
     },
     isFocused: () => {
-      return elements.length > 0;
+      return data.length > 0;
+    },
+    getCurrentIndex: () => {
+      return focusedData.index;
+    },
+    getCurrentElement: () => {
+      return focusedData ? (focusedData.element as HTMLElement) : null;
     },
   };
+}
+
+function isElementVisibleOnScreen(element?: SelectorResult) {
+  if (!element || !(element as HTMLElement).getBoundingClientRect) {
+    return false;
+  }
+  const rect = (element as HTMLElement).getBoundingClientRect();
+  return (
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.top >= 0 &&
+    rect.left >= 0 &&
+    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+  );
 }
 
 function isChild(parent: HTMLElement, assumedChildren: Array<SelectorResult | null | undefined>) {
@@ -151,7 +199,8 @@ function resolveKeyboardCommand(event: KeyboardEvent, keys: Props['keys']): Even
   return null;
 }
 
-function createKeyboardTracker(target: HTMLElement, keys: Props['keys'], childGetter: ElementGetter) {
+function createKeyboardTracker(target: HTMLElement, props: Props, childGetter: ElementGetter) {
+  const { keys, subLevelSelector, isSubLevelVisible } = props;
   const focusTracker = createFocusTracker();
   const keyListener = (keyboardEvent: KeyboardEvent) => {
     if (!focusTracker.isFocused()) {
@@ -168,6 +217,17 @@ function createKeyboardTracker(target: HTMLElement, keys: Props['keys'], childGe
       const wasElementFocused = focusTracker[command]();
       if (!wasElementFocused) {
         console.log('element was not focusable');
+      } else if (subLevelSelector) {
+        const focusedElement = focusTracker.getCurrentElement();
+        const focusIndex = focusTracker.getCurrentIndex();
+        if (isSubLevelVisible && !isSubLevelVisible(focusedElement, focusIndex)) {
+          //
+        }
+        const subLevelItems = Array.from(focusedElement.querySelectorAll(subLevelSelector as string));
+        console.log('subLevelItems', focusedElement, subLevelSelector, subLevelItems);
+        if (subLevelItems.length) {
+          console.log('subLevelItems', subLevelItems.map(isElementVisibleOnScreen));
+        }
       }
     }
   };
@@ -237,7 +297,7 @@ function useKeyboardNavigation(props: Props = {}) {
     (observedElement: HTMLElement | null) => {
       observedElementRef.current = observedElement;
       if (observedElement) {
-        tracker.current = createKeyboardTracker(observedElement, combinedProps.keys, childGetter);
+        tracker.current = createKeyboardTracker(observedElement, combinedProps, childGetter);
       }
       return observedElementRef;
     },
@@ -266,6 +326,9 @@ function useKeyboardNavigation(props: Props = {}) {
       //
     },
     changeToSubmenu: () => {
+      //
+    },
+    refresh: () => {
       //
     },
   };
