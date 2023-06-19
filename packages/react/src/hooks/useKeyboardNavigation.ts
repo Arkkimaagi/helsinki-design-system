@@ -2,16 +2,17 @@ import React, { useCallback, useEffect, useRef } from 'react';
 
 type FocusableElement = HTMLElement;
 type SelectorResult = FocusableElement | Node | EventTarget;
-type ElementGetter = (parent?: FocusableElement, index?: number) => SelectorResult[];
+type ElementGetter = () => SelectorResult[];
+type SubLevelElementGetter = (parent: SelectorResult, index: number) => SelectorResult[];
 type ElementSelector = string | ElementGetter;
-type RefListener = (element: HTMLElement) => React.MutableRefObject<HTMLElement | null>;
+type RefListener = (element: HTMLElement | null) => React.MutableRefObject<HTMLElement | null>;
 type EventListener = (e: Event) => void;
 type EventType = 'escape' | 'focusOut' | 'focusIn' | 'next' | 'previous' | 'levelDown' | 'levelUp';
 type KeyboardTracker = ReturnType<typeof createKeyboardTracker>;
 type Props = {
   childSelector?: ElementSelector;
   escapeSelector?: ElementSelector;
-  subLevelSelector?: ElementSelector;
+  subLevelSelector?: string | SubLevelElementGetter;
   keys?: {
     nextSibling: string[];
     previousSibling: string[];
@@ -20,6 +21,7 @@ type Props = {
     escape?: string[];
   };
   loop?: boolean;
+  filterHiddenElements?: boolean;
   forceFocus?: boolean;
   disableOnMultiKeyDown?: boolean;
   onChange?: (type: EventType, element?: HTMLElement) => void;
@@ -29,8 +31,8 @@ type FocusData = {
   element: SelectorResult;
   index: number;
   hasFocus: boolean;
-  subLevel: null | FocusData[];
-  parentData: null | FocusData;
+  subLevel: FocusData[] | null;
+  parentData: FocusData | null;
 };
 
 const defaultProps: Props = {
@@ -38,11 +40,23 @@ const defaultProps: Props = {
   keys: {
     nextSibling: ['ArrowDown'],
     previousSibling: ['ArrowUp'],
+    nextLevel: ['s'],
+    previousLevel: ['w'],
   },
   loop: false,
   forceFocus: true,
   disableOnMultiKeyDown: true,
+  filterHiddenElements: true,
 };
+
+function deepFindData(targetArray: FocusData[], predicate: (item: FocusData) => boolean): FocusData | null {
+  const result = targetArray.find(predicate);
+  if (result) {
+    return result;
+  }
+  const filteredResult = targetArray.filter((item) => !!item.subLevel && deepFindData(item.subLevel, predicate));
+  return filteredResult ? filteredResult[0] : null;
+}
 
 function forceFocusToElement(element?: SelectorResult) {
   if (!element || !(element as FocusableElement).focus) {
@@ -58,6 +72,21 @@ function forceFocusToElement(element?: SelectorResult) {
     focusableElement.focus();
   }
   return document.activeElement === element;
+}
+
+function isElementVisibleOnScreen(element?: SelectorResult) {
+  if (!element || !(element as HTMLElement).getBoundingClientRect) {
+    return false;
+  }
+  const rect = (element as HTMLElement).getBoundingClientRect();
+  return (
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.top >= 0 &&
+    rect.left >= 0 &&
+    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+  );
 }
 
 function createFocusData(element: SelectorResult, index: number): FocusData {
@@ -103,10 +132,43 @@ function createFocusTracker() {
     focusedData.hasFocus = true;
     return index;
   };
+  const getElementData = (element: SelectorResult) => {
+    return deepFindData(data, (item: FocusData) => item.element === element);
+  };
+  const getIndexPath = (focusData: FocusData, target: number[] = []) => {
+    const { index } = focusData;
+    target.unshift(index);
+    if (focusData.parentData) {
+      return getIndexPath(focusData.parentData, target);
+    }
+    return target;
+  };
+  const getDataFromIndexPath = (indexPath: number[] = []) => {
+    const start = data[indexPath[0]];
+    if (!start) {
+      return null;
+    }
+    return indexPath.reduce((currentData, pathIndex, index) => {
+      // ignore first item because it is picked aboce
+      if (index === 0) {
+        return currentData;
+      }
+      return currentData ? currentData.subLevel[pathIndex] : null;
+    }, start);
+  };
+  const getFocusData = (target: number[] | SelectorResult | FocusData): FocusData | null => {
+    if ((target as FocusData).element !== undefined) {
+      return target as FocusData;
+    }
+    if (Array.isArray(target)) {
+      return getDataFromIndexPath(target as number[]);
+    }
+    return getElementData(target as SelectorResult);
+  };
   return {
     reset: (elementList: SelectorResult[]) => {
       focusedData = null;
-      data = elementList.map(createFocusData);
+      data = elementList.filter(isElementVisibleOnScreen).map(createFocusData);
     },
     next: () => {
       const targetData = data[setIndex(getIndex(1))];
@@ -116,19 +178,58 @@ function createFocusTracker() {
       const targetData = data[setIndex(getIndex(-1))];
       return forceFocusToElement(targetData.element);
     },
+    levelDown: () => {
+      const subLevelItems = focusedData.subLevel && focusedData.subLevel.length ? focusedData.subLevel : null;
+      if (!subLevelItems) {
+        return false;
+      }
+      const { element } = subLevelItems[0];
+      return forceFocusToElement(element);
+    },
     isFocused: () => {
       return data.length > 0;
     },
     getCurrentIndex: () => {
       return focusedData.index;
     },
+    getCurrentItem: () => {
+      return focusedData || null;
+    },
     getCurrentElement: () => {
       return focusedData ? (focusedData.element as HTMLElement) : null;
+    },
+    getElementData,
+    getIndexPath,
+    getElementIndexPath: (element: SelectorResult) => {
+      const d = getElementData(element);
+      return d ? getIndexPath(d) : [];
+    },
+    insertSublevel: (target: number[] | SelectorResult | FocusData, elementList: SelectorResult[]) => {
+      const parent = getFocusData(target);
+      if (!parent) {
+        return false;
+      }
+      parent.subLevel = elementList.filter(isElementVisibleOnScreen).map(createFocusData);
+      console.log('SUBLEVEL ADDED', parent);
+      return true;
+    },
+    removeSublevel: (indexPath: number[]) => {
+      const target = indexPath ? getDataFromIndexPath(indexPath) : focusedData;
+      if (!target) {
+        return false;
+      }
+      const { hasFocus } = target;
+      target.subLevel = undefined;
+      if (hasFocus) {
+        // or child had focus....
+      }
+      return true;
     },
   };
 }
 
-function isElementVisibleOnScreen(element?: SelectorResult) {
+/*
+function getLogicalSublevelKey(element?: SelectorResult) {
   if (!element || !(element as HTMLElement).getBoundingClientRect) {
     return false;
   }
@@ -142,6 +243,7 @@ function isElementVisibleOnScreen(element?: SelectorResult) {
     rect.right <= (window.innerWidth || document.documentElement.clientWidth)
   );
 }
+*/
 
 function isChild(parent: HTMLElement, assumedChildren: Array<SelectorResult | null | undefined>) {
   return assumedChildren.some((child) => {
@@ -196,11 +298,22 @@ function resolveKeyboardCommand(event: KeyboardEvent, keys: Props['keys']): Even
   if (keys.previousSibling.includes(key)) {
     return 'previous';
   }
+  if (keys.previousLevel && keys.previousLevel.includes(key)) {
+    return 'levelUp';
+  }
+  if (keys.nextLevel && keys.nextLevel.includes(key)) {
+    return 'levelDown';
+  }
   return null;
 }
 
-function createKeyboardTracker(target: HTMLElement, props: Props, childGetter: ElementGetter) {
-  const { keys, subLevelSelector, isSubLevelVisible } = props;
+function createKeyboardTracker(
+  target: HTMLElement,
+  props: Props,
+  childGetter: ElementGetter,
+  subLevelGetter?: SubLevelElementGetter,
+) {
+  const { keys } = props;
   const focusTracker = createFocusTracker();
   const keyListener = (keyboardEvent: KeyboardEvent) => {
     if (!focusTracker.isFocused()) {
@@ -217,18 +330,20 @@ function createKeyboardTracker(target: HTMLElement, props: Props, childGetter: E
       const wasElementFocused = focusTracker[command]();
       if (!wasElementFocused) {
         console.log('element was not focusable');
-      } else if (subLevelSelector) {
-        const focusedElement = focusTracker.getCurrentElement();
-        const focusIndex = focusTracker.getCurrentIndex();
-        if (isSubLevelVisible && !isSubLevelVisible(focusedElement, focusIndex)) {
-          //
+      } else if (subLevelGetter) {
+        const currentItem = focusTracker.getCurrentItem();
+        if (!currentItem) {
+          return;
         }
-        const subLevelItems = Array.from(focusedElement.querySelectorAll(subLevelSelector as string));
-        console.log('subLevelItems', focusedElement, subLevelSelector, subLevelItems);
+        const subLevelItems = subLevelGetter(currentItem.element, currentItem.index);
         if (subLevelItems.length) {
-          console.log('subLevelItems', subLevelItems.map(isElementVisibleOnScreen));
+          console.log('subLevelItems', subLevelItems);
+          focusTracker.insertSublevel(currentItem, subLevelItems);
         }
       }
+    }
+    if (command === 'levelDown') {
+      focusTracker.levelDown();
     }
   };
   const focusInListener = () => {
@@ -293,11 +408,23 @@ function useKeyboardNavigation(props: Props = {}) {
         }
       : combinedProps.childSelector;
 
+  const subLevelGetter: SubLevelElementGetter | undefined =
+    typeof combinedProps.subLevelSelector === 'string'
+      ? () => {
+          if (!observedElementRef.current) {
+            return [];
+          }
+          return Array.from(
+            observedElementRef.current.querySelectorAll(combinedProps.subLevelSelector as string),
+          ) as FocusableElement[];
+        }
+      : combinedProps.subLevelSelector;
+
   const refListener: RefListener = useCallback(
     (observedElement: HTMLElement | null) => {
       observedElementRef.current = observedElement;
       if (observedElement) {
-        tracker.current = createKeyboardTracker(observedElement, combinedProps, childGetter);
+        tracker.current = createKeyboardTracker(observedElement, combinedProps, childGetter, subLevelGetter);
       }
       return observedElementRef;
     },
@@ -330,6 +457,11 @@ function useKeyboardNavigation(props: Props = {}) {
     },
     refresh: () => {
       //
+    },
+    forceFocus: (index: number, targetSublevel = false) => {
+      if (targetSublevel) {
+        //
+      }
     },
   };
 }
