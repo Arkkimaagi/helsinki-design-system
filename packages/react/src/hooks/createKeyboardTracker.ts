@@ -269,6 +269,10 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
     }
     isFocused = true;
     focusTracker.reset(getChildren(target));
+    const item = focusTracker.getElementItem(relevantElement);
+    if (item) {
+      focusTracker.setFocusToIndex(item.index);
+    }
     triggerOnChange('focusIn', relevantElement);
   };
   const focusOutListener = (focusEvent: FocusEvent) => {
