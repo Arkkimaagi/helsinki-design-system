@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 
-import { KeyboardTrackerProps, createKeyboardTracker } from './createKeyboardTracker';
+import { KeyboardTrackerProps, createKeyboardTracker, KeyboardTracker } from './createKeyboardTracker';
 
 type RefListener = (element: HTMLElement | null) => React.MutableRefObject<HTMLElement | null>;
-
-type KeyboardTracker = ReturnType<typeof createKeyboardTracker>;
 
 function useKeyboardNavigation(props: KeyboardTrackerProps = {}) {
   const observedElementRef = useRef<HTMLElement | null>(null);
@@ -35,6 +33,12 @@ function useKeyboardNavigation(props: KeyboardTrackerProps = {}) {
   }, [cleanUp]);
 
   return {
+    setFocusedElementByIndex: (index: number) => {
+      if (!tracker.current) {
+        return;
+      }
+      tracker.current.setFocusedElementByIndex(index);
+    },
     ref: refListener,
   };
 }
