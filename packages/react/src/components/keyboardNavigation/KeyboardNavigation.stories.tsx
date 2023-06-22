@@ -1,9 +1,11 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { KeyboardNavigation } from './KeyboardNavigation';
 import useKeyboardNavigation from '../../hooks/useKeyboardNavigation';
 import useFocusTrapping from '../../hooks/useFocusTrapping';
 import { KeyboardTrackerProps } from '../../hooks/createKeyboardTracker';
+import { Button } from '../button/Button';
+import { TextInput } from '../textInput/TextInput';
 
 export default {
   component: KeyboardNavigation,
@@ -64,7 +66,6 @@ export const ExampleWithFocusHelpers = () => {
       }
       if (type === 'focusIn' && focusIsNotInTrackedElement) {
         const position = item ? getElementPosition(item.element) : undefined;
-        console.log('position', position, item && item.element);
         tracker.setFocusedElementByIndex(position === 'last' ? -1 : 0);
         // do not disable before setting index or focus is lost when disabled
         // this will result in focusOut event
@@ -116,6 +117,112 @@ export const ExampleWithFocusHelpers = () => {
         </button>
       </div>
       <button type="button">Next focusable</button>
+    </div>
+  );
+};
+
+export const ExampleWithDynamicElements = () => {
+  const [items, setItems] = useState<string[]>(['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5']);
+  const [insertionIndex, setInsertionIndex] = useState<string>('-1');
+  const lastFocusedIndexRef = useRef<number[]>([]);
+  const resetFocusProps = useRef<{ removeIndex: number; addIndex: number } | undefined>(undefined);
+  const { ref, refresh, setFocusedElementByIndex } = useKeyboardNavigation({
+    childSelector: 'li a',
+    onChange: (type, tracker, item) => {
+      if (type === 'focusChange' && item) {
+        lastFocusedIndexRef.current.unshift(item.index);
+      }
+    },
+  });
+  const resetFocus = ({ removeIndex, addIndex }: { removeIndex: number; addIndex: number }) => {
+    const lastFocusIndex = lastFocusedIndexRef.current[0];
+    refresh();
+    if (lastFocusIndex === undefined) {
+      return;
+    }
+    if (removeIndex > -1) {
+      setFocusedElementByIndex(lastFocusIndex >= removeIndex ? lastFocusIndex - 1 : lastFocusIndex);
+    }
+    if (addIndex > -1) {
+      setFocusedElementByIndex(addIndex >= lastFocusIndex ? lastFocusIndex : lastFocusIndex + 1);
+    }
+  };
+  const removeItem = (e: React.MouseEvent, removeIndex: number) => {
+    setItems((currentItems) => {
+      const clone = [...currentItems];
+      clone.splice(removeIndex, 1);
+      return clone;
+    });
+    e.preventDefault();
+    resetFocusProps.current = { removeIndex, addIndex: -1 };
+  };
+  const addItem = () => {
+    const index = parseInt(insertionIndex, 10);
+    setItems((currentItems) => {
+      const clone = [...currentItems];
+      const addIndex = !Number.isNaN(index) && index >= 0 ? index : currentItems.length;
+      clone.splice(addIndex, 0, `New ${addIndex + 1}/${clone.length + 1}`);
+      resetFocusProps.current = { removeIndex: -1, addIndex };
+      return clone;
+    });
+  };
+  useEffect(() => {
+    if (resetFocusProps.current) {
+      resetFocus(resetFocusProps.current);
+      resetFocusProps.current = undefined;
+    }
+  }, [items.length]);
+  return (
+    <div>
+      <div ref={ref}>
+        <style>
+          {`
+          .nav {
+            list-style: none;
+            display:flex;
+          }
+          .nav li {
+            padding:10px;
+          }
+          .nav li a{
+            padding:4px;
+          }
+          .nav li a:focus,.nav li a:focus-visible  {
+            outline:1px solid blue;
+          }
+        `}
+        </style>
+        <p>Click an item to remove it.</p>
+        <ul className="nav">
+          {items.map((data, index) => {
+            return (
+              <li key={data}>
+                <a
+                  tabIndex={0}
+                  href="#remove"
+                  onClick={(e) => {
+                    removeItem(e, index);
+                  }}
+                >
+                  {data}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div>
+        <p>Add a new item</p>
+        <TextInput
+          id="insertionIndex"
+          label="Index"
+          value={insertionIndex}
+          onInput={(e) => {
+            setInsertionIndex(e.currentTarget.value);
+          }}
+        />
+        <Button onClick={() => addItem()}>Add item</Button>
+      </div>
     </div>
   );
 };

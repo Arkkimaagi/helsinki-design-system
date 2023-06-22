@@ -107,7 +107,6 @@ function createFocusTracker(loop: boolean) {
   let focusItems: FocusItem[] = [];
   const getIndex = (dir: 1 | -1) => {
     if (!focusItems.length) {
-      currentFocusItem = null;
       return -1;
     }
     if (!currentFocusItem) {
@@ -147,19 +146,25 @@ function createFocusTracker(loop: boolean) {
     return forceFocusToElement(targetData.element);
   };
 
+  const elementListToArray = (elementList: ElementList) => {
+    return Array.isArray(elementList) ? elementList : Array.from(elementList);
+  };
+
+  const getElementItem = (element: SelectorResult | null) => {
+    return focusItems.find((item) => item.element && item.element === element);
+  };
+
   return {
     reset: (elementList: ElementList) => {
-      const elementArray = Array.isArray(elementList) ? elementList : Array.from(elementList);
+      const elementArray = elementListToArray(elementList);
       currentFocusItem = null;
       focusItems = elementArray.filter(isElementVisibleOnScreen).map(createFocusData);
     },
     next: () => {
-      const targetData = focusItems[setIndex(getIndex(1))];
-      return forceFocusToElement(targetData.element);
+      return setFocusedElementByIndex(getIndex(1));
     },
     previous: () => {
-      const targetData = focusItems[setIndex(getIndex(-1))];
-      return forceFocusToElement(targetData.element);
+      return setFocusedElementByIndex(getIndex(-1));
     },
     hasFocusableItems: () => {
       return focusItems.length > 0;
@@ -174,8 +179,27 @@ function createFocusTracker(loop: boolean) {
       const scopedIndex = index < 0 ? focusItems.length + index : Math.min(index, focusItems.length - 1);
       return setFocusedElementByIndex(scopedIndex);
     },
-    getElementItem: (element: SelectorResult | null) => {
-      return focusItems.find((item) => item.element && item.element === element);
+    getElementItem,
+    refresh: (newElementList: ElementList) => {
+      const elementArray = elementListToArray(newElementList);
+      if (!newElementList.length) {
+        focusItems.length = 0;
+        return;
+      }
+      const currentElement = currentFocusItem?.element;
+      focusItems = elementArray.map(
+        (element, index): FocusItem => {
+          return {
+            element,
+            index,
+            hasFocus: false,
+          };
+        },
+      );
+      const item = currentElement && getElementItem(currentElement);
+      if (item) {
+        setFocusedElementByIndex(item.index);
+      }
     },
   };
 }
@@ -227,17 +251,37 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
   const { keys, getChildren, loop, onChange } = options;
   const focusTracker = createFocusTracker(loop);
   let isFocused = false;
-  const triggerOnChange = (type: EventType, element?: FocusableElement | EventTarget | null) => {
+  const getFocusItem = (itemProps: Partial<FocusItem>): FocusItem | undefined => {
+    const hasIndex = itemProps.index !== undefined && itemProps.index > -1;
+    const hasTrackedElement = itemProps.element && focusTracker.isTrackedElement(itemProps.element);
+    if (!hasTrackedElement) {
+      if (!itemProps.element) {
+        return undefined;
+      }
+      return {
+        element: itemProps.element,
+        index: -1,
+        hasFocus: false,
+      };
+    }
+    if (itemProps.element) {
+      return focusTracker.getElementItem(itemProps.element);
+    }
+    if (hasIndex) {
+      return itemProps as FocusItem;
+    }
+    return undefined;
+  };
+  const triggerOnChange = (type: EventType, itemProps?: Partial<FocusItem>) => {
     if (!onChange) {
       return;
     }
-    const itemByElement = element && focusTracker.getElementItem(element);
-    const item = element && !itemByElement ? { element, index: -1, hasFocus: false } : itemByElement;
+    const item = itemProps ? getFocusItem(itemProps) : focusTracker.getCurrentItem();
     onChange(
       type,
       // eslint-disable-next-line @typescript-eslint/no-use-before-define
       tracker,
-      element ? item : focusTracker.getCurrentItem(),
+      item,
     );
   };
   const keyListener = (keyboardEvent: KeyboardEvent) => {
@@ -258,10 +302,10 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
   const focusInListener = (focusEvent: FocusEvent) => {
     // focusEvent.currentTarget is the element with listeners, aka. container
     // focusEvent.relatedTarget is the previous element with the focus
-    const relevantElement = focusEvent.target;
+    const relevantElement = focusEvent.target as FocusItem['element'];
     if (isFocused) {
       if (!focusTracker.isTrackedElement(relevantElement)) {
-        triggerOnChange('focusChange', relevantElement as FocusableElement);
+        triggerOnChange('focusChange', { element: relevantElement });
       } else {
         triggerOnChange('focusChange');
       }
@@ -273,7 +317,7 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
     if (item) {
       focusTracker.setFocusToIndex(item.index);
     }
-    triggerOnChange('focusIn', relevantElement);
+    triggerOnChange('focusIn', { element: relevantElement });
   };
   const focusOutListener = (focusEvent: FocusEvent) => {
     // focusEvent.currentTarget is the element with listeners, aka. container
@@ -284,9 +328,10 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
     if (isChild(target, [relevantElement, document.activeElement])) {
       // do nothing yet
     } else {
+      const current = { ...focusTracker.getCurrentItem() };
       focusTracker.reset([]);
       isFocused = false;
-      triggerOnChange('focusOut');
+      triggerOnChange('focusOut', { ...current, hasFocus: false });
     }
   };
 
@@ -304,6 +349,9 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
     },
     setFocusedElementByIndex: (index: number) => {
       focusTracker.setFocusToIndex(index);
+    },
+    refresh: (elements?: ElementList) => {
+      focusTracker.refresh(elements || getChildren(target));
     },
   };
   return tracker;

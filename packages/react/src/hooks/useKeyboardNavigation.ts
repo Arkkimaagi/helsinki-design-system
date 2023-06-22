@@ -40,6 +40,12 @@ function useKeyboardNavigation(props: KeyboardTrackerProps = {}) {
       tracker.current.setFocusedElementByIndex(index);
     },
     ref: refListener,
+    refresh: () => {
+      if (!tracker.current) {
+        return;
+      }
+      tracker.current.refresh();
+    },
   };
 }
 export default useKeyboardNavigation;
