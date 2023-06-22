@@ -235,3 +235,48 @@ export const ExampleWithDynamicElements = () => {
     </div>
   );
 };
+
+export const MutationExample = () => {
+  const { ref } = useKeyboardNavigation({
+    childSelector: 'li',
+    autoUpdateOnMutation: true,
+  });
+  const [showMenu, setShowMenu] = useState(false);
+  const toggleMenu = () => {
+    setShowMenu((current) => !current);
+  };
+  return (
+    <div>
+      <div ref={ref}>
+        <style>
+          {`
+          .menu {
+            list-style: none;
+            display:flex;
+            flex-direction: column;
+          }
+          .menu.hidden {
+            display:none;
+          }
+          .menu li {
+            padding:10px;
+          }
+        `}
+        </style>
+        <div className="container">
+          <button type="button" onClick={() => toggleMenu()}>
+            Open menu
+          </button>
+          <ul className={`menu${showMenu ? '' : ' hidden'}`}>
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+            <li tabIndex={0}>Item 1</li>
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+            <li tabIndex={0}>Item 2</li>
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+            <li tabIndex={0}>Item 3</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+};

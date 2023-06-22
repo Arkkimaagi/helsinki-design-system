@@ -196,9 +196,10 @@ function createFocusTracker(loop: boolean) {
     },
     getElementItem,
     refresh: (newElementList: ElementList) => {
-      const elementArray = elementListToArray(newElementList);
+      const elementArray = elementListToArray(newElementList).filter(isElementVisibleOnScreen);
       if (!newElementList.length) {
         focusItems.length = 0;
+        currentFocusItem = null;
         return;
       }
       const currentElement = currentFocusItem?.element;
@@ -214,6 +215,8 @@ function createFocusTracker(loop: boolean) {
       const item = currentElement && getElementItem(currentElement);
       if (item) {
         setFocusedElementByIndex(item.index);
+      } else {
+        currentFocusItem = null;
       }
     },
     storeFocusedElement: (element?: SelectorResult | null) => {
