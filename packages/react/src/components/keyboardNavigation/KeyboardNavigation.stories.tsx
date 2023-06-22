@@ -280,3 +280,80 @@ export const MutationExample = () => {
     </div>
   );
 };
+
+export const MultiLevelExample = () => {
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const { ref } = useKeyboardNavigation({
+    childSelector: ':scope li > a',
+    autoUpdateOnMutation: true,
+  });
+  const setFocus = (index: number) => {
+    setFocusedIndex(index);
+  };
+  return (
+    <div ref={ref}>
+      <style>
+        {`
+          .nav {
+            list-style: none;
+            display:flex;
+            flex-direction:column;
+          }
+          .nav li {
+            padding:10px;
+            display:flex;
+            position:relative;
+          }
+          .nav li a{
+            padding:4px;
+            border:1px solid #ccc;
+            margin: 2px;
+          }
+          .nav li a:focus, .nav li a:focus-visible{
+            background-color:#ccc;
+            outline:1px solid blue;
+          }
+        `}
+      </style>
+      <ul className="nav">
+        {items.map((data, index) => {
+          return (
+            <li key={`${data}_${Math.random()}`}>
+              <a
+                tabIndex={0}
+                href="#nothing"
+                onClick={(e) => {
+                  e.preventDefault();
+                }}
+              >
+                {data}
+              </a>
+              <button type="button" onClick={() => setFocus(index)}>
+                x
+              </button>
+              {focusedIndex === index &&
+                [0, 1, 2].map((childData) => {
+                  return (
+                    <ul className="nav">
+                      <li key={`${childData}_${Math.random()}`}>
+                        <a
+                          tabIndex={0}
+                          href="#nothing"
+                          onClick={(e) => {
+                            e.preventDefault();
+                          }}
+                        >
+                          {`${data}.${childData}`}
+                        </a>
+                      </li>
+                    </ul>
+                  );
+                })}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+};
