@@ -129,22 +129,31 @@ export const ExampleWithDynamicElements = () => {
   const { ref, refresh, setFocusedElementByIndex } = useKeyboardNavigation({
     childSelector: 'li a',
     onChange: (type, tracker, item) => {
-      if (type === 'focusChange' && item) {
+      if (type === 'focusChange' && item && item.index > -1) {
         lastFocusedIndexRef.current.unshift(item.index);
       }
     },
   });
   const resetFocus = ({ removeIndex, addIndex }: { removeIndex: number; addIndex: number }) => {
-    const lastFocusIndex = lastFocusedIndexRef.current[0];
+    const previouslyFocusedElement =
+      removeIndex > -1
+        ? lastFocusedIndexRef.current.find((index) => removeIndex !== index)
+        : lastFocusedIndexRef.current[0];
     refresh();
-    if (lastFocusIndex === undefined) {
+
+    if (previouslyFocusedElement === undefined) {
       return;
     }
     if (removeIndex > -1) {
-      setFocusedElementByIndex(lastFocusIndex >= removeIndex ? lastFocusIndex - 1 : lastFocusIndex);
+      lastFocusedIndexRef.current = lastFocusedIndexRef.current.filter((i) => i !== removeIndex);
+      setFocusedElementByIndex(
+        previouslyFocusedElement > removeIndex ? previouslyFocusedElement - 1 : previouslyFocusedElement,
+      );
     }
     if (addIndex > -1) {
-      setFocusedElementByIndex(addIndex >= lastFocusIndex ? lastFocusIndex : lastFocusIndex + 1);
+      setFocusedElementByIndex(
+        addIndex >= previouslyFocusedElement ? previouslyFocusedElement : previouslyFocusedElement + 1,
+      );
     }
   };
   const removeItem = (e: React.MouseEvent, removeIndex: number) => {
@@ -196,7 +205,7 @@ export const ExampleWithDynamicElements = () => {
         <ul className="nav">
           {items.map((data, index) => {
             return (
-              <li key={data}>
+              <li key={`${data}_${Math.random()}`}>
                 <a
                   tabIndex={0}
                   href="#remove"

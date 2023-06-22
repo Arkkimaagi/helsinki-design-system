@@ -123,15 +123,25 @@ function createFocusTracker(loop: boolean) {
     }
     return Math.max(0, currentFocusItem.index - 1);
   };
-  const setIndex = (index: number) => {
+
+  const setCurrentItem = (item: FocusItem) => {
+    if (currentFocusItem === item) {
+      return false;
+    }
     if (currentFocusItem) {
       currentFocusItem.hasFocus = false;
     }
-    currentFocusItem = focusItems[index];
-    if (!currentFocusItem) {
+    currentFocusItem = item;
+    currentFocusItem.hasFocus = true;
+    return true;
+  };
+
+  const setCurrentItemByIndex = (index: number) => {
+    const item = focusItems[index];
+    if (!item) {
       return -1;
     }
-    currentFocusItem.hasFocus = true;
+    setCurrentItem(item);
     return index;
   };
 
@@ -139,11 +149,16 @@ function createFocusTracker(loop: boolean) {
     if (index < 0) {
       return false;
     }
-    const targetData = focusItems[setIndex(index)];
+    const targetData = focusItems[index];
     if (!targetData) {
       return false;
     }
     return forceFocusToElement(targetData.element);
+  };
+
+  const setFocusedItemByIndex = (index: number) => {
+    const targetIndex = setCurrentItemByIndex(index);
+    return setFocusedElementByIndex(targetIndex);
   };
 
   const elementListToArray = (elementList: ElementList) => {
@@ -177,7 +192,7 @@ function createFocusTracker(loop: boolean) {
     },
     setFocusToIndex: (index: number) => {
       const scopedIndex = index < 0 ? focusItems.length + index : Math.min(index, focusItems.length - 1);
-      return setFocusedElementByIndex(scopedIndex);
+      return setFocusedItemByIndex(scopedIndex);
     },
     getElementItem,
     refresh: (newElementList: ElementList) => {
@@ -200,6 +215,17 @@ function createFocusTracker(loop: boolean) {
       if (item) {
         setFocusedElementByIndex(item.index);
       }
+    },
+    storeFocusedElement: (element?: SelectorResult | null) => {
+      if (!element) {
+        return false;
+      }
+      const item = getElementItem(element);
+      if (!item || item === currentFocusItem) {
+        return false;
+      }
+
+      return setCurrentItem(item);
     },
   };
 }
@@ -307,7 +333,10 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
       if (!focusTracker.isTrackedElement(relevantElement)) {
         triggerOnChange('focusChange', { element: relevantElement });
       } else {
-        triggerOnChange('focusChange');
+        const focusWasChanged = focusTracker.storeFocusedElement(relevantElement);
+        if (focusWasChanged) {
+          triggerOnChange('focusChange');
+        }
       }
       return;
     }
