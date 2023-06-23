@@ -60,17 +60,17 @@ function useKeyboardNavigation(props: KeyboardTrackerHookProps = {}) {
 
   return {
     setFocusedElementByIndex: (index: number) => {
-      if (!tracker.current) {
-        return;
-      }
-      tracker.current.setFocusedElementByIndex(index);
+      return tracker.current ? tracker.current.setFocusedElementByIndex(index) : undefined;
     },
     ref: refListener,
     refresh: () => {
-      if (!tracker.current) {
-        return;
-      }
-      tracker.current.refresh();
+      return tracker.current ? tracker.current.refresh() : undefined;
+    },
+    setFocusedItem: (...args: Parameters<KeyboardTracker['setFocus']>) => {
+      return tracker.current ? tracker.current.setFocus(...args) : undefined;
+    },
+    getElement: () => {
+      return observedElementRef.current;
     },
   };
 }

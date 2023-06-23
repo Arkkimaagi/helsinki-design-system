@@ -6,7 +6,7 @@ type ElementList = SelectorResult[] | NodeList;
 
 type ChildGetter = (rootElement: HTMLElement) => ElementList;
 
-type EventType = 'next' | 'previous' | 'focusIn' | 'focusOut' | 'focusChange';
+type EventType = 'next' | 'previous' | 'focusIn' | 'focusOut' | 'focusChange' | 'dataUpdated';
 
 type Options = {
   getChildren: ChildGetter;
@@ -94,7 +94,7 @@ function isElementVisibleOnScreen(element?: SelectorResult) {
   );
 }
 
-function createFocusData(element: SelectorResult, index: number): FocusItem {
+function createFocusData(element: SelectorResult, index = -1): FocusItem {
   return {
     element,
     index,
@@ -168,6 +168,9 @@ function createFocusTracker(loop: boolean) {
   const getElementItem = (element: SelectorResult | null) => {
     return focusItems.find((item) => item.element && item.element === element);
   };
+  const getItemByIndex = (index: number) => {
+    return focusItems[index];
+  };
 
   return {
     reset: (elementList: ElementList) => {
@@ -195,6 +198,7 @@ function createFocusTracker(loop: boolean) {
       return setFocusedItemByIndex(scopedIndex);
     },
     getElementItem,
+    getItemByIndex,
     refresh: (newElementList: ElementList) => {
       const elementArray = elementListToArray(newElementList).filter(isElementVisibleOnScreen);
       if (!newElementList.length) {
@@ -280,37 +284,15 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
   const { keys, getChildren, loop, onChange } = options;
   const focusTracker = createFocusTracker(loop);
   let isFocused = false;
-  const getFocusItem = (itemProps: Partial<FocusItem>): FocusItem | undefined => {
-    const hasIndex = itemProps.index !== undefined && itemProps.index > -1;
-    const hasTrackedElement = itemProps.element && focusTracker.isTrackedElement(itemProps.element);
-    if (!hasTrackedElement) {
-      if (!itemProps.element) {
-        return undefined;
-      }
-      return {
-        element: itemProps.element,
-        index: -1,
-        hasFocus: false,
-      };
-    }
-    if (itemProps.element) {
-      return focusTracker.getElementItem(itemProps.element);
-    }
-    if (hasIndex) {
-      return itemProps as FocusItem;
-    }
-    return undefined;
-  };
-  const triggerOnChange = (type: EventType, itemProps?: Partial<FocusItem>) => {
+  const triggerOnChange = (type: EventType, item?: FocusItem | null) => {
     if (!onChange) {
       return;
     }
-    const item = itemProps ? getFocusItem(itemProps) : focusTracker.getCurrentItem();
     onChange(
       type,
       // eslint-disable-next-line @typescript-eslint/no-use-before-define
       tracker,
-      item,
+      item as FocusItem | null,
     );
   };
   const keyListener = (keyboardEvent: KeyboardEvent) => {
@@ -334,22 +316,23 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
     const relevantElement = focusEvent.target as FocusItem['element'];
     if (isFocused) {
       if (!focusTracker.isTrackedElement(relevantElement)) {
-        triggerOnChange('focusChange', { element: relevantElement });
+        triggerOnChange('focusChange', createFocusData(relevantElement));
       } else {
         const focusWasChanged = focusTracker.storeFocusedElement(relevantElement);
         if (focusWasChanged) {
-          triggerOnChange('focusChange');
+          triggerOnChange('focusChange', focusTracker.getCurrentItem() as FocusItem);
         }
       }
       return;
     }
     isFocused = true;
     focusTracker.reset(getChildren(target));
+    triggerOnChange('dataUpdated');
     const item = focusTracker.getElementItem(relevantElement);
     if (item) {
       focusTracker.setFocusToIndex(item.index);
     }
-    triggerOnChange('focusIn', { element: relevantElement });
+    triggerOnChange('focusIn', item);
   };
   const focusOutListener = (focusEvent: FocusEvent) => {
     // focusEvent.currentTarget is the element with listeners, aka. container
@@ -360,10 +343,11 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
     if (isChild(target, [relevantElement, document.activeElement])) {
       // do nothing yet
     } else {
-      const current = { ...focusTracker.getCurrentItem() };
+      const current = focusTracker.getCurrentItem();
       focusTracker.reset([]);
+      triggerOnChange('dataUpdated');
       isFocused = false;
-      triggerOnChange('focusOut', { ...current, hasFocus: false });
+      triggerOnChange('focusOut', current ? { ...current, hasFocus: false } : null);
     }
   };
 
@@ -384,6 +368,22 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
     },
     refresh: (elements?: ElementList) => {
       focusTracker.refresh(elements || getChildren(target));
+      triggerOnChange('dataUpdated');
+    },
+    setFocus: (item: Partial<FocusItem>) => {
+      const match = item.element
+        ? focusTracker.getElementItem(item.element)
+        : focusTracker.getItemByIndex(item.index || -1);
+      if (!match) {
+        return false;
+      }
+      if (item.element && match.element !== item.element) {
+        return false;
+      }
+      if (item.index !== undefined && match.index !== item.index) {
+        return false;
+      }
+      return focusTracker.setFocusToIndex(match.index);
     },
   };
   return tracker;

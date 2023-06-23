@@ -283,13 +283,26 @@ export const MutationExample = () => {
 
 export const MultiLevelExample = () => {
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const pendingFocusShift = useRef<number>(-1);
   const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-  const { ref } = useKeyboardNavigation({
-    childSelector: ':scope li > a',
+  const { ref, getElement, setFocusedItem } = useKeyboardNavigation({
+    childSelector: ':scope li > a, :scope li > button',
     autoUpdateOnMutation: true,
+    onChange: (type) => {
+      if (type === 'dataUpdated' && pendingFocusShift.current > 0) {
+        const element = getElement();
+        const buttons = element && element.querySelectorAll(':scope li > button');
+        const target = buttons && buttons.length && buttons[pendingFocusShift.current];
+        if (target) {
+          setFocusedItem({ element: target });
+        }
+        pendingFocusShift.current = -1;
+      }
+    },
   });
   const setFocus = (index: number) => {
-    setFocusedIndex(index);
+    setFocusedIndex(focusedIndex === index ? -1 : index);
+    pendingFocusShift.current = index;
   };
   return (
     <div ref={ref}>
@@ -314,12 +327,15 @@ export const MultiLevelExample = () => {
             background-color:#ccc;
             outline:1px solid blue;
           }
+          .subNav{
+            flex-direction:row;
+          }
         `}
       </style>
       <ul className="nav">
         {items.map((data, index) => {
           return (
-            <li key={`${data}_${Math.random()}`}>
+            <li key={data}>
               <a
                 tabIndex={0}
                 href="#nothing"
@@ -332,11 +348,11 @@ export const MultiLevelExample = () => {
               <button type="button" onClick={() => setFocus(index)}>
                 x
               </button>
-              {focusedIndex === index &&
-                [0, 1, 2].map((childData) => {
-                  return (
-                    <ul className="nav">
-                      <li key={`${childData}_${Math.random()}`}>
+              {focusedIndex === index && (
+                <ul className="nav subNav">
+                  {[0, 1, 2].map((childData) => {
+                    return (
+                      <li key={`${data}.${childData}}`}>
                         <a
                           tabIndex={0}
                           href="#nothing"
@@ -347,9 +363,10 @@ export const MultiLevelExample = () => {
                           {`${data}.${childData}`}
                         </a>
                       </li>
-                    </ul>
-                  );
-                })}
+                    );
+                  })}
+                </ul>
+              )}
             </li>
           );
         })}
