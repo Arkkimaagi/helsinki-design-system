@@ -66,8 +66,8 @@ function useKeyboardNavigation(props: KeyboardTrackerHookProps = {}) {
     refresh: () => {
       return tracker.current ? tracker.current.refresh() : undefined;
     },
-    setFocusedItem: (...args: Parameters<KeyboardTracker['setFocus']>) => {
-      return tracker.current ? tracker.current.setFocus(...args) : undefined;
+    setFocusToElementDataOrPath: (...args: Parameters<KeyboardTracker['setFocusToElementDataOrPath']>) => {
+      return tracker.current ? tracker.current.setFocusToElementDataOrPath(...args) : undefined;
     },
     getElement: () => {
       return observedElementRef.current;

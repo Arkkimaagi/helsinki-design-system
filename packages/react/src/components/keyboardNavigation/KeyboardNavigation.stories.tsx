@@ -17,7 +17,7 @@ export default {
 };
 export const Example = () => {
   const { ref } = useKeyboardNavigation({
-    childSelector: 'li',
+    focusableSelector: 'li',
   });
 
   return (
@@ -57,13 +57,10 @@ export const ExampleWithFocusHelpers = () => {
   } = useFocusTrapping({
     manualControls: true,
   });
-  const onChangeListeners = useRef<Set<Required<KeyboardTrackerProps>['onChange']>>(new Set());
   const keyboardTrackerOnChange = useCallback<Required<KeyboardTrackerProps>['onChange']>(
-    (type, tracker, item) => {
+    (type, tracker, path) => {
+      const item = path ? path[path.length - 1] : undefined;
       const focusIsNotInTrackedElement = !item || (item && item.index === -1);
-      if (onChangeListeners.current.size) {
-        onChangeListeners.current.forEach((func) => func(type, tracker, item));
-      }
       if (type === 'focusIn' && focusIsNotInTrackedElement) {
         const position = item ? getElementPosition(item.element) : undefined;
         tracker.setFocusedElementByIndex(position === 'last' ? -1 : 0);
@@ -78,7 +75,7 @@ export const ExampleWithFocusHelpers = () => {
     [enableElements, disableElements],
   );
   const { ref } = useKeyboardNavigation({
-    childSelector: 'li',
+    focusableSelector: 'li',
     onChange: keyboardTrackerOnChange,
   });
 
@@ -127,8 +124,9 @@ export const ExampleWithDynamicElements = () => {
   const lastFocusedIndexRef = useRef<number[]>([]);
   const resetFocusProps = useRef<{ removeIndex: number; addIndex: number } | undefined>(undefined);
   const { ref, refresh, setFocusedElementByIndex } = useKeyboardNavigation({
-    childSelector: 'li a',
-    onChange: (type, tracker, item) => {
+    focusableSelector: 'li a',
+    onChange: (type, tracker, path) => {
+      const item = path ? path[path.length - 1] : undefined;
       if (type === 'focusChange' && item && item.index > -1) {
         lastFocusedIndexRef.current.unshift(item.index);
       }
@@ -238,7 +236,7 @@ export const ExampleWithDynamicElements = () => {
 
 export const MutationExample = () => {
   const { ref } = useKeyboardNavigation({
-    childSelector: 'li',
+    focusableSelector: 'li',
     autoUpdateOnMutation: true,
   });
   const [showMenu, setShowMenu] = useState(false);
@@ -282,28 +280,20 @@ export const MutationExample = () => {
 };
 
 export const MultiLevelExample = () => {
-  const [focusedIndex, setFocusedIndex] = useState(-1);
-  const pendingFocusShift = useRef<number>(-1);
+  const [focusedIndex, setFocusedIndex] = useState([-1, -1]);
   const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-  const { ref, getElement, setFocusedItem } = useKeyboardNavigation({
-    childSelector: ':scope li > a, :scope li > button',
+  const { ref } = useKeyboardNavigation({
+    containerSelector: ':scope > ul > li',
+    focusableSelector: ':scope > a, :scope > button',
     autoUpdateOnMutation: true,
-    onChange: (type) => {
-      if (type === 'dataUpdated' && pendingFocusShift.current > 0) {
-        const element = getElement();
-        const buttons = element && element.querySelectorAll(':scope li > button');
-        const target = buttons && buttons.length && buttons[pendingFocusShift.current];
-        if (target) {
-          setFocusedItem({ element: target });
-        }
-        pendingFocusShift.current = -1;
-      }
-    },
   });
-  const setFocus = (index: number) => {
-    setFocusedIndex(focusedIndex === index ? -1 : index);
-    pendingFocusShift.current = index;
+  const setFocusLevel0 = (index: number) => {
+    setFocusedIndex([focusedIndex[0] === index ? -1 : index, -1]);
   };
+  const setFocusLevel1 = (level0: number, level1: number) => {
+    setFocusedIndex([level0, focusedIndex[1] === level1 ? -1 : level1]);
+  };
+
   return (
     <div ref={ref}>
       <style>
@@ -312,6 +302,7 @@ export const MultiLevelExample = () => {
             list-style: none;
             display:flex;
             flex-direction:column;
+            position:relative;
           }
           .nav li {
             padding:10px;
@@ -330,6 +321,12 @@ export const MultiLevelExample = () => {
           .subNav{
             flex-direction:row;
           }
+          .subNav2{
+            flex-direction:column;
+            position:absolute;
+            top:40px;
+            left:0;
+          }
         `}
       </style>
       <ul className="nav">
@@ -345,12 +342,12 @@ export const MultiLevelExample = () => {
               >
                 {data}
               </a>
-              <button type="button" onClick={() => setFocus(index)}>
-                x
+              <button type="button" onClick={() => setFocusLevel0(index)}>
+                {'\u203a'}
               </button>
-              {focusedIndex === index && (
+              {focusedIndex[0] === index && (
                 <ul className="nav subNav">
-                  {[0, 1, 2].map((childData) => {
+                  {[0, 1, 2].map((childData, subIndex) => {
                     return (
                       <li key={`${data}.${childData}}`}>
                         <a
@@ -362,6 +359,29 @@ export const MultiLevelExample = () => {
                         >
                           {`${data}.${childData}`}
                         </a>
+                        <button type="button" onClick={() => setFocusLevel1(index, subIndex)}>
+                          {'\u203a'}
+                          {'\u203a'}
+                        </button>
+                        {focusedIndex[1] === subIndex && (
+                          <ul className="nav subNav2">
+                            {['a', 'b', 'c'].map((grandChildData) => {
+                              return (
+                                <li key={`${data}.${childData}.${grandChildData}}`}>
+                                  <a
+                                    tabIndex={0}
+                                    href="#nothing"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                    }}
+                                  >
+                                    {`${data}.${childData}.${grandChildData}`}
+                                  </a>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
                       </li>
                     );
                   })}
