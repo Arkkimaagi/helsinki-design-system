@@ -69,8 +69,8 @@ const defaults: Options = {
   keys: {
     next: ['ArrowDown', 'ArrowRight'],
     previous: ['ArrowUp', 'ArrowLeft'],
-    levelDown: ['PageDown', 'a'],
-    levelUp: ['PageUp', 'Escape', 'q'],
+    levelDown: [''],
+    levelUp: ['Escape'],
   },
   loop: true,
   autoFocusAfterUpdate: true,
@@ -691,6 +691,7 @@ function bindEvents({
 
 function resolveKeyboardCommand(event: KeyboardEvent, keys: Options['keys']): EventType | null {
   const { key } = event;
+  console.log('key', key, keys);
   if (keys.next.includes(key)) {
     return 'next';
   }
@@ -708,7 +709,7 @@ function resolveKeyboardCommand(event: KeyboardEvent, keys: Options['keys']): Ev
 
 export function createKeyboardTracker(target: HTMLElement, props: KeyboardTrackerProps) {
   const options = createOptions(props);
-  const { keys, loop, onChange, selectors, autoFocusAfterUpdate } = options;
+  const { loop, onChange, selectors, autoFocusAfterUpdate } = options;
   const elementTracker = createElementTracker(target, selectors);
   const focusTracker = createFocusTracker(elementTracker, loop);
   let isFocused = false;
@@ -741,7 +742,8 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
   };
 
   const keyListener = (keyboardEvent: KeyboardEvent) => {
-    const command = resolveKeyboardCommand(keyboardEvent, keys);
+    const command = resolveKeyboardCommand(keyboardEvent, options.keys);
+    console.log('command', command);
     if (!command) {
       return;
     }
@@ -822,6 +824,21 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
     },
     refresh: () => {
       updateElementData(autoFocusAfterUpdate);
+    },
+    getNavigationOptions: (): ReturnType<ElementTracker['getNavigationOptions']> => {
+      const current = focusTracker.getCurrentFocusedElementData();
+      return current && current.element ? elementTracker.getNavigationOptions(current.element, loop) : {};
+    },
+    getFocusedElement: () => {
+      const current = focusTracker.getCurrentFocusedElementData();
+      return (current && current.element) || document.activeElement;
+    },
+    setKeys: (newKeys: Partial<Options['keys']>) => {
+      options.keys = {
+        ...options.keys,
+        ...newKeys,
+      };
+      return options.keys;
     },
   };
   return tracker;

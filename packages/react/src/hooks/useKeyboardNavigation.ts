@@ -72,6 +72,9 @@ function useKeyboardNavigation(props: KeyboardTrackerHookProps = {}) {
     getElement: () => {
       return observedElementRef.current;
     },
+    setKeys: (...args: Parameters<KeyboardTracker['setKeys']>) => {
+      return tracker.current ? tracker.current.setKeys(...args) : undefined;
+    },
   };
 }
 export default useKeyboardNavigation;

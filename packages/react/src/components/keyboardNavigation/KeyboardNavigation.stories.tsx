@@ -278,7 +278,6 @@ export const MutationExample = () => {
     </div>
   );
 };
-
 export const MultiLevelExample = () => {
   const [focusedIndex, setFocusedIndex] = useState([-1, -1]);
   const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -286,6 +285,12 @@ export const MultiLevelExample = () => {
     containerSelector: ':scope > ul > li',
     focusableSelector: ':scope > a, :scope > button',
     autoUpdateOnMutation: true,
+    keys: {
+      next: ['ArrowDown', 'ArrowRight'],
+      previous: ['ArrowUp', 'ArrowLeft'],
+      levelDown: ['PageDown', 'a'],
+      levelUp: ['PageUp', 'Escape', 'q'],
+    },
   });
   const setFocusLevel0 = (index: number) => {
     setFocusedIndex([focusedIndex[0] === index ? -1 : index, -1]);
@@ -293,6 +298,170 @@ export const MultiLevelExample = () => {
   const setFocusLevel1 = (level0: number, level1: number) => {
     setFocusedIndex([level0, focusedIndex[1] === level1 ? -1 : level1]);
   };
+
+  return (
+    <div ref={ref}>
+      <style>
+        {`
+          .nav {
+            list-style: none;
+            display:flex;
+            flex-direction:column;
+            position:relative;
+          }
+          .nav li {
+            padding:10px;
+            display:flex;
+            position:relative;
+          }
+          .nav li a{
+            padding:4px;
+            border:1px solid #ccc;
+            margin: 2px;
+          }
+          .nav li a:focus, .nav li a:focus-visible{
+            background-color:#ccc;
+            outline:1px solid blue;
+          }
+          .subNav{
+            flex-direction:row;
+          }
+          .subNav2{
+            flex-direction:column;
+            position:absolute;
+            top:40px;
+            left:0;
+          }
+        `}
+      </style>
+      <ul className="nav">
+        {items.map((data, index) => {
+          return (
+            <li key={data}>
+              <a
+                tabIndex={0}
+                href="#nothing"
+                onClick={(e) => {
+                  e.preventDefault();
+                }}
+              >
+                {data}
+              </a>
+              <button type="button" onClick={() => setFocusLevel0(index)}>
+                {'\u203a'}
+              </button>
+              {focusedIndex[0] === index && (
+                <ul className="nav subNav">
+                  {[0, 1, 2].map((childData, subIndex) => {
+                    return (
+                      <li key={`${data}.${childData}}`}>
+                        <a
+                          tabIndex={0}
+                          href="#nothing"
+                          onClick={(e) => {
+                            e.preventDefault();
+                          }}
+                        >
+                          {`${data}.${childData}`}
+                        </a>
+                        <button type="button" onClick={() => setFocusLevel1(index, subIndex)}>
+                          {'\u203a'}
+                          {'\u203a'}
+                        </button>
+                        {focusedIndex[1] === subIndex && (
+                          <ul className="nav subNav2">
+                            {['a', 'b', 'c'].map((grandChildData) => {
+                              return (
+                                <li key={`${data}.${childData}.${grandChildData}}`}>
+                                  <a
+                                    tabIndex={0}
+                                    href="#nothing"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                    }}
+                                  >
+                                    {`${data}.${childData}.${grandChildData}`}
+                                  </a>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+};
+export const SwapKeysExample = () => {
+  /* const getElementPosition = (element: Element, relatedTo: Element) => {
+    if (!element || !relatedTo) {
+      return [0, 0, 0, 0];
+    }
+    const elementBounds = element.getBoundingClientRect();
+    const relatedBounds = relatedTo.getBoundingClientRect();
+    const left = relatedBounds.x - elementBounds.x;
+    const right = left + elementBounds.width - relatedBounds.width;
+    const top = relatedBounds.y - elementBounds.y;
+    const bottom = top + elementBounds.height - relatedBounds.height;
+    return [top, right, bottom, left];
+  }; */
+  let defaultKeys: KeyboardTrackerProps['keys'];
+  const [focusedIndex, setFocusedIndex] = useState([-1, -1]);
+  const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const { ref, setKeys } = useKeyboardNavigation({
+    containerSelector: ':scope > ul > li',
+    focusableSelector: ':scope > a, :scope > button',
+    autoUpdateOnMutation: true,
+    onChange: (type, tracker) => {
+      if (type === 'dataUpdated' || type === 'focusChange') {
+        if (!defaultKeys) {
+          defaultKeys = setKeys({});
+        }
+        const newKeys: Partial<KeyboardTrackerProps['keys']> = {};
+        const navOpts = tracker.getNavigationOptions();
+        const currentElement = tracker.getFocusedElement();
+        if (!currentElement) {
+          return;
+        }
+        console.log('navOpts', navOpts);
+        newKeys.next = navOpts.levelDown ? ['ArrowDown'] : ['ArrowRight', 'ArrowDown'];
+        newKeys.levelDown = navOpts.levelDown ? ['ArrowRight'] : undefined;
+        newKeys.levelUp = navOpts.levelUp ? ['ArrowLeft', 'Escape'] : undefined;
+        newKeys.previous = navOpts.levelUp ? ['ArrowUp'] : ['ArrowLeft', 'ArrowUp'];
+        if (navOpts.next) {
+          // const nextPos = getElementPosition(navOpts.next, currentElement);
+        }
+        console.log('newKeys', {
+          ...defaultKeys,
+          ...newKeys,
+        });
+        setKeys({
+          ...defaultKeys,
+          ...newKeys,
+        });
+      }
+    },
+  });
+  const setFocusLevel0 = (index: number) => {
+    setFocusedIndex([focusedIndex[0] === index ? -1 : index, -1]);
+  };
+  const setFocusLevel1 = (level0: number, level1: number) => {
+    setFocusedIndex([level0, focusedIndex[1] === level1 ? -1 : level1]);
+  };
+
+  /*
+  const autoAdjustKeys = (current) => {
+    // if next element is top -> ArrowUp
+    // if next element is bottom -> ArrowDown
+  };
+  */
 
   return (
     <div ref={ref}>
