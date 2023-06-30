@@ -40,6 +40,7 @@ type Options = {
   onChange?: (event: EventType, tracker: KeyboardTracker, path: ElementPath | null | undefined) => void;
   selectors: Selectors;
   autoFocusAfterUpdate: boolean;
+  navigator?: ElementTracker['getNavigationOptions'];
 };
 
 /*
@@ -527,9 +528,9 @@ function createElementTracker(root: HTMLElement, selectors: Selectors) {
   };
 }
 
-function createFocusTracker(elementTracker: ElementTracker, loop: boolean) {
+function createFocusTracker(elementTracker: ElementTracker, loop: boolean, externalNavigator: Options['navigator']) {
   let pathToCurrentFocusedElement: ElementPath | null = null;
-
+  const navigator = externalNavigator || elementTracker.getNavigationOptions;
   const storeValidPathToFocusedElement = (path?: ElementPath | null) => {
     if (!path) {
       pathToCurrentFocusedElement = null;
@@ -597,37 +598,31 @@ function createFocusTracker(elementTracker: ElementTracker, loop: boolean) {
     return isValid;
   };
 
+  const navigateTo = (direction: keyof NavigationOptions) => {
+    if (!pathToCurrentFocusedElement) {
+      console.log('N');
+      return setFocusToContainer(elementTracker.getRootData(), direction === 'previous' ? -1 : 0);
+    }
+    console.log('N2');
+    const directions = navigator(pathToCurrentFocusedElement, loop);
+    return forceFocusToElement(directions[direction]);
+  };
+
   return {
     reset: () => {
       pathToCurrentFocusedElement = null;
     },
     next: () => {
-      if (!pathToCurrentFocusedElement) {
-        return setFocusToContainer(elementTracker.getRootData(), 0);
-      }
-      const { next } = elementTracker.getNavigationOptions(pathToCurrentFocusedElement, loop);
-      return forceFocusToElement(next);
+      return navigateTo('next');
     },
     previous: () => {
-      if (!pathToCurrentFocusedElement) {
-        return setFocusToContainer(elementTracker.getRootData(), -1);
-      }
-      const { previous } = elementTracker.getNavigationOptions(pathToCurrentFocusedElement, loop);
-      return forceFocusToElement(previous);
+      return navigateTo('previous');
     },
     levelDown: () => {
-      if (!pathToCurrentFocusedElement) {
-        return setFocusToContainer(elementTracker.getRootData(), 0);
-      }
-      const { levelDown } = elementTracker.getNavigationOptions(pathToCurrentFocusedElement, loop);
-      return forceFocusToElement(levelDown);
+      return navigateTo('levelDown');
     },
     levelUp: () => {
-      if (!pathToCurrentFocusedElement) {
-        return setFocusToContainer(elementTracker.getRootData(), 0);
-      }
-      const { levelUp } = elementTracker.getNavigationOptions(pathToCurrentFocusedElement, loop);
-      return forceFocusToElement(levelUp);
+      return navigateTo('levelUp');
     },
     hasFocusableItems: (container: ElementData) => {
       return elementTracker.getClosestFocusableElements(container).length > 0;
@@ -691,7 +686,6 @@ function bindEvents({
 
 function resolveKeyboardCommand(event: KeyboardEvent, keys: Options['keys']): EventType | null {
   const { key } = event;
-  console.log('key', key, keys);
   if (keys.next.includes(key)) {
     return 'next';
   }
@@ -709,9 +703,9 @@ function resolveKeyboardCommand(event: KeyboardEvent, keys: Options['keys']): Ev
 
 export function createKeyboardTracker(target: HTMLElement, props: KeyboardTrackerProps) {
   const options = createOptions(props);
-  const { loop, onChange, selectors, autoFocusAfterUpdate } = options;
+  const { loop, onChange, selectors, autoFocusAfterUpdate, navigator } = options;
   const elementTracker = createElementTracker(target, selectors);
-  const focusTracker = createFocusTracker(elementTracker, loop);
+  const focusTracker = createFocusTracker(elementTracker, loop, navigator);
   let isFocused = false;
 
   const triggerOnChange = (type: EventType, path?: ElementPath | null) => {
@@ -743,7 +737,6 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
 
   const keyListener = (keyboardEvent: KeyboardEvent) => {
     const command = resolveKeyboardCommand(keyboardEvent, options.keys);
-    console.log('command', command);
     if (!command) {
       return;
     }

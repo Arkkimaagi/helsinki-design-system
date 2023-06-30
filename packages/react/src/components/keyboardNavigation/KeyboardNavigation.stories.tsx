@@ -563,3 +563,130 @@ export const SwapKeysExample = () => {
     </div>
   );
 };
+
+export const CustomNavigatorExample = () => {
+  const items = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const getId = (index: number, childIndex: number) => {
+    return `pos_${index}_${childIndex}`;
+  };
+  const getElement = (index: number, childIndex: number) => {
+    return document.getElementById(getId(index, childIndex)) || undefined;
+  };
+  const getPos = (element: HTMLElement): number[] => {
+    const id = element.getAttribute('id');
+    return id
+      ? id
+          .split('_')
+          .map((n) => parseInt(n, 10))
+          .slice(-2)
+      : [-1, -1];
+  };
+  const { ref } = useKeyboardNavigation({
+    focusableSelector: 'a',
+    navigator: (elementOrPath) => {
+      if (elementOrPath) {
+        const path = Array.isArray(elementOrPath) ? elementOrPath : [];
+        const data = path[path.length - 1];
+        if (data && data.element) {
+          const pos = getPos(data.element);
+          return {
+            next: getElement(pos[0], pos[1] + 1),
+            previous: getElement(pos[0], pos[1] - 1),
+            levelDown: getElement(pos[0] + 1, pos[1]),
+            levelUp: getElement(pos[0] - 1, pos[1]),
+          };
+        }
+      }
+      return {
+        next: undefined,
+        previous: undefined,
+        levelUp: undefined,
+        levelDown: undefined,
+      };
+    },
+    keys: {
+      next: ['ArrowRight'],
+      previous: ['ArrowLeft'],
+      levelDown: ['ArrowDown'],
+      levelUp: ['ArrowUp'],
+    },
+  });
+
+  const skip = (index: number, childIndex: number) => {
+    if ((index === 1 || index === 2 || index === 3) && (childIndex < 4 || childIndex === 5 || childIndex > 6)) {
+      return true;
+    }
+    if ((index === 5 || index === 6 || index === 7) && childIndex > 3 && childIndex < 7) {
+      return true;
+    }
+    if ((index === 7 || index === 8) && childIndex > 3 && childIndex < 7) {
+      return true;
+    }
+    if (index === 6 && childIndex > 0 && childIndex < 9) {
+      return true;
+    }
+
+    return false;
+  };
+
+  return (
+    <div ref={ref}>
+      <style>
+        {`
+          .nav {
+            list-style: none;
+            display:flex;
+            flex-direction:column;
+            position:relative;
+          }
+          .nav li {
+            display:flex;
+            position:relative;
+          }
+          .nav li a{
+            position:absolute;
+            padding:4px;
+            width:24px;
+            height:24px;
+            display: block;
+            border:1px solid #ccc;
+            margin: 2px;
+          }
+          .nav li a:focus, .nav li a:focus-visible{
+            background-color:#ccc;
+            outline:1px solid blue;
+          }
+        `}
+      </style>
+      <ul className="nav">
+        {items.map((data) => {
+          return (
+            <li key={data}>
+              {items.map((childData) => {
+                if (skip(data, childData)) {
+                  return null;
+                }
+                const id = getId(data, childData);
+                return (
+                  <a
+                    key={id}
+                    id={id}
+                    tabIndex={0}
+                    href="#nothing"
+                    onClick={(e) => {
+                      e.preventDefault();
+                    }}
+                    className={id}
+                    style={{ top: `${data * 28}px`, left: `${childData * 28}px` }}
+                  >
+                    {`${data}.${childData}`}
+                  </a>
+                );
+              })}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+};
