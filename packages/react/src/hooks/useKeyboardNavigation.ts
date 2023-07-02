@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 
-import { KeyboardTrackerProps, createKeyboardTracker, KeyboardTracker } from './createKeyboardTracker';
+import { createKeyboardTracker } from './keyboardNavigation/createKeyboardTracker';
 import useMutationObserver from './useMutationObserver';
+import { KeyboardTracker, KeyboardTrackerProps } from './keyboardNavigation';
 
 type RefListener = (element: HTMLElement | null) => React.MutableRefObject<HTMLElement | null>;
 type KeyboardTrackerHookProps = KeyboardTrackerProps & {
@@ -11,7 +12,7 @@ type KeyboardTrackerHookProps = KeyboardTrackerProps & {
 function useKeyboardNavigation(props: KeyboardTrackerHookProps = {}) {
   const { autoUpdateOnMutation, autoUpdateOnRender, ...trackerProps } = props;
   const observedElementRef = useRef<HTMLElement | null>(null);
-  const tracker = useRef<KeyboardTracker | undefined>(undefined);
+  const tracker = useRef<KeyboardTracker | null>(null);
   const mutationListener = useCallback(() => {
     if (!autoUpdateOnMutation) {
       return;
@@ -25,6 +26,13 @@ function useKeyboardNavigation(props: KeyboardTrackerHookProps = {}) {
   const refListener: RefListener = useCallback(
     (observedElement: HTMLElement | null) => {
       observedElementRef.current = observedElement;
+      if (!observedElement || observedElement !== observedElementRef.current) {
+        if (tracker.current) {
+          tracker.current.dispose();
+          tracker.current = null;
+        }
+        observedElementRef.current = null;
+      }
       if (observedElement) {
         tracker.current = createKeyboardTracker(observedElement, trackerProps);
         if (autoUpdateOnMutation) {
@@ -39,7 +47,7 @@ function useKeyboardNavigation(props: KeyboardTrackerHookProps = {}) {
   const cleanUp = useCallback(() => {
     if (tracker.current) {
       tracker.current.dispose();
-      tracker.current = undefined;
+      tracker.current = null;
     }
     mutationObserver.disconnect();
   }, []);
@@ -59,7 +67,7 @@ function useKeyboardNavigation(props: KeyboardTrackerHookProps = {}) {
   }, [cleanUp]);
 
   return {
-    setFocusedElementByIndex: (index: number) => {
+    setFocusedElementByIndex: (index: number | number[]) => {
       return tracker.current ? tracker.current.setFocusedElementByIndex(index) : undefined;
     },
     ref: refListener,

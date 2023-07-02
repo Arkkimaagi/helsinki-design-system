@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 
-import { FocusTrapper, createFocusTrapper, FocusTrapperProps, Position } from './createFocusTrapper';
+import { FocusTrapper, createFocusTrapper, FocusTrapperProps, Position } from './focusTrapper/createFocusTrapper';
 
 type RefListener = (element: HTMLElement | null) => React.MutableRefObject<HTMLElement | null>;
 
-function useFocusTrapping(props: FocusTrapperProps) {
+function useFocusTrapper(props: FocusTrapperProps) {
   const firstTrapperRef = useRef<HTMLElement | null>(null);
   const lastTrapperRef = useRef<HTMLElement | null>(null);
   const tracker = useRef<FocusTrapper | undefined>(undefined);
@@ -67,4 +67,4 @@ function useFocusTrapping(props: FocusTrapperProps) {
     },
   };
 }
-export default useFocusTrapping;
+export default useFocusTrapper;

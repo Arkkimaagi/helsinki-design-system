@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { KeyboardNavigation } from './KeyboardNavigation';
 import useKeyboardNavigation from '../../hooks/useKeyboardNavigation';
-import useFocusTrapping from '../../hooks/useFocusTrapping';
-import { KeyboardTrackerProps } from '../../hooks/createKeyboardTracker';
+import useFocusTrapper from '../../hooks/useFocusTrapper';
+import { KeyboardTrackerProps } from '../../hooks/keyboardNavigation/index';
 import { Button } from '../button/Button';
 import { TextInput } from '../textInput/TextInput';
 
@@ -19,12 +19,10 @@ export const Example = () => {
   const { ref } = useKeyboardNavigation({
     focusableSelector: 'li',
   });
-
   return (
     <div>
-      <div ref={ref}>
-        <style>
-          {`
+      <style>
+        {`
           .nav {
             list-style: none;
             display:flex;
@@ -33,7 +31,8 @@ export const Example = () => {
             padding:10px;
           }
         `}
-        </style>
+      </style>
+      <div ref={ref}>
         <ul className="nav">
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
           <li tabIndex={0}>Item 1</li>
@@ -47,6 +46,64 @@ export const Example = () => {
   );
 };
 
+export const KeepAndResetFocus = () => {
+  const selectedElementIndexPathRef = useRef<number[]>([]);
+  const { ref, setFocusedElementByIndex } = useKeyboardNavigation({
+    focusableSelector: 'li',
+    onChange: (type, tracker, path) => {
+      if (type === 'focusChange') {
+        selectedElementIndexPathRef.current = path ? path.map((data) => data.index) : [];
+      }
+    },
+  });
+  const [show, setShow] = useState(true);
+  const [key, setKey] = useState(Math.random());
+
+  useEffect(() => {
+    if (show && selectedElementIndexPathRef.current.length) {
+      setFocusedElementByIndex(selectedElementIndexPathRef.current);
+      selectedElementIndexPathRef.current = [];
+    }
+  });
+
+  return (
+    <div>
+      <style>
+        {`
+          .nav {
+            list-style: none;
+            display:flex;
+          }
+          .nav li {
+            padding:10px;
+          }
+          .nav li:focus,.nav li:focus-visible  {
+            outline:1px solid blue;
+          }
+        `}
+      </style>
+      <Button type="button" onClick={() => setShow(!show)}>
+        Toggle
+      </Button>
+      <Button type="button" onClick={() => setKey(Math.random())}>
+        setKey
+      </Button>
+      {show && (
+        <div ref={ref} key={key}>
+          <ul className="nav">
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+            <li tabIndex={0}>Item 1</li>
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+            <li tabIndex={0}>Item 2</li>
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+            <li tabIndex={0}>Item 3</li>
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const ExampleWithFocusHelpers = () => {
   const {
     refForFirstTrapper,
@@ -54,7 +111,7 @@ export const ExampleWithFocusHelpers = () => {
     disableElements,
     enableElements,
     getElementPosition,
-  } = useFocusTrapping({
+  } = useFocusTrapper({
     manualControls: true,
   });
   const keyboardTrackerOnChange = useCallback<Required<KeyboardTrackerProps>['onChange']>(
@@ -430,7 +487,6 @@ export const SwapKeysExample = () => {
         if (!currentElement) {
           return;
         }
-        console.log('navOpts', navOpts);
         newKeys.next = navOpts.levelDown ? ['ArrowDown'] : ['ArrowRight', 'ArrowDown'];
         newKeys.levelDown = navOpts.levelDown ? ['ArrowRight'] : undefined;
         newKeys.levelUp = navOpts.levelUp ? ['ArrowLeft', 'Escape'] : undefined;
@@ -438,10 +494,6 @@ export const SwapKeysExample = () => {
         if (navOpts.next) {
           // const nextPos = getElementPosition(navOpts.next, currentElement);
         }
-        console.log('newKeys', {
-          ...defaultKeys,
-          ...newKeys,
-        });
         setKeys({
           ...defaultKeys,
           ...newKeys,
