@@ -41,18 +41,18 @@ function findElementPath(searchPath: ElementPath, target: HTMLElement): ElementP
     return [{ ...untrackedElementData }];
   }
   const predicate = (data: ElementData) => data.element === target;
-  if (startPoint.focusable) {
-    const hit = startPoint.focusable.find(predicate);
+  if (startPoint.focusableElements) {
+    const hit = startPoint.focusableElements.find(predicate);
     if (hit) {
       return [...searchPath, hit];
     }
   }
-  if (startPoint.childContainers) {
-    const hit = startPoint.childContainers.find(predicate);
+  if (startPoint.containerElements) {
+    const hit = startPoint.containerElements.find(predicate);
     if (hit) {
       return [...searchPath, hit];
     }
-    const childHit = startPoint.childContainers
+    const childHit = startPoint.containerElements
       .map((data) => {
         return findElementPath([...searchPath, data], target);
       })
@@ -84,7 +84,7 @@ function addMappedElements(path: ElementPath, selectors: Selectors) {
       return data;
     });
     if (childContainers.length) {
-      targetData.childContainers = childContainers;
+      targetData.containerElements = childContainers;
       childContainers.forEach((data) => {
         addMappedElements([...path, data], selectors);
       });
@@ -101,7 +101,7 @@ function addMappedElements(path: ElementPath, selectors: Selectors) {
     };
   });
   if (focusable.length) {
-    targetData.focusable = focusable;
+    targetData.focusableElements = focusable;
   }
 }
 
@@ -121,13 +121,13 @@ function disposeData(elementData: ElementData | null) {
     return;
   }
   elementData.element = undefined;
-  if (elementData.childContainers) {
-    elementData.childContainers.forEach(disposeData);
-    elementData.childContainers = undefined;
+  if (elementData.containerElements) {
+    elementData.containerElements.forEach(disposeData);
+    elementData.containerElements = undefined;
   }
-  if (elementData.focusable) {
-    elementData.focusable.forEach(disposeData);
-    elementData.focusable = undefined;
+  if (elementData.focusableElements) {
+    elementData.focusableElements.forEach(disposeData);
+    elementData.focusableElements = undefined;
   }
   /* eslint-enable no-param-reassign */
 }
@@ -156,16 +156,16 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
   };
 
   const collectDeepestFocusable = (parent: ElementData) => {
-    if (parent.childContainers) {
-      return parent.childContainers.reduce((currentList, container) => {
-        if (!container.focusable) {
+    if (parent.containerElements) {
+      return parent.containerElements.reduce((currentList, container) => {
+        if (!container.focusableElements) {
           return currentList;
         }
-        return [...currentList, ...container.focusable];
+        return [...currentList, ...container.focusableElements];
       }, [] as ElementData[]);
     }
-    if (parent.focusable) {
-      return parent.focusable;
+    if (parent.focusableElements) {
+      return parent.focusableElements;
     }
     return [];
   };
@@ -175,7 +175,7 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
     // so root must exists as first childContainers
     let currentParent: ElementData | undefined = {
       ...untrackedElementData,
-      childContainers: rootData ? [rootData] : undefined,
+      containerElements: rootData ? [rootData] : undefined,
     };
     let notFound = false;
     if (!indexes.length) {
@@ -185,9 +185,9 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
       if (notFound || !currentParent) {
         return untrackedElementData;
       }
-      const containerCount = currentParent.childContainers ? currentParent.childContainers.length : 0;
+      const containerCount = currentParent.containerElements ? currentParent.containerElements.length : 0;
       const adjustedIndex = index < 0 ? containerCount + index : index;
-      const target = currentParent.childContainers && currentParent.childContainers[adjustedIndex];
+      const target = currentParent.containerElements && currentParent.containerElements[adjustedIndex];
       if (!target || target.index !== adjustedIndex) {
         notFound = true;
         return untrackedElementData;
@@ -209,9 +209,9 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
     if (!parent) {
       return null;
     }
-    const focusableCount = parent.focusable ? parent.focusable.length : 0;
+    const focusableCount = parent.focusableElements ? parent.focusableElements.length : 0;
     const adjustedIndex = last < 0 ? focusableCount + last : last;
-    const focusable = returnValidElementData(parent.focusable && parent.focusable[adjustedIndex]);
+    const focusable = returnValidElementData(parent.focusableElements && parent.focusableElements[adjustedIndex]);
     if (focusable && focusable.index === adjustedIndex) {
       parentPath.push(focusable);
       return parentPath;
@@ -245,11 +245,11 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
     if (!parent) {
       return {};
     }
-    const firstContainerDown = parent.childContainers && parent.childContainers[0];
+    const firstContainerDown = parent.containerElements && parent.containerElements[0];
     const levelDown = firstContainerDown && getRelatedFocusableElements(firstContainerDown)[0];
 
     const grandParent = pathToFocusable.at(-3);
-    const closestFocusableUp = grandParent && grandParent.focusable && grandParent.focusable.at(-1);
+    const closestFocusableUp = grandParent && grandParent.focusableElements && grandParent.focusableElements.at(-1);
 
     return {
       levelDown,

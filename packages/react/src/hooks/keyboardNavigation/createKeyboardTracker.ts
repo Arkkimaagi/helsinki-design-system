@@ -250,7 +250,7 @@ export function createKeyboardTracker(target: HTMLElement, props: KeyboardTracke
     },
     setFocusedElementByIndex: (index: number | number[]) => {
       moveFocusToRoot();
-      const indexes = Array.isArray(index) ? index : [index];
+      const indexes = Array.isArray(index) ? index : [0, index];
       return focusTracker.setFocusByIndexes(indexes);
     },
     setFocusToElement: (element?: FocusableElement | null) => {

@@ -19,9 +19,12 @@ export type NavigationOptions = {
   levelDown?: FocusableElement;
 };
 
-export type KeyboardTrackerProps = Partial<Exclude<KeyboardTrackerOptions, 'selectors'>> & {
-  focusableSelector?: NodeSelector | string;
-  containerSelector?: NodeSelector | string;
+export type NodeSelector = (parent: HTMLElement, path: ElementPath) => NodeList;
+export type Selector = (parent: HTMLElement, path: ElementPath) => HTMLElement[];
+
+export type Selectors = {
+  containerElements?: Selector;
+  focusableElements: Selector;
 };
 
 export type KeyboardTrackerOptions = {
@@ -38,13 +41,18 @@ export type KeyboardTrackerOptions = {
   navigator?: ElementMapper['getNavigationOptions'];
 };
 
+export type KeyboardTrackerProps = Partial<Exclude<KeyboardTrackerOptions, 'selectors'>> & {
+  focusableSelector?: NodeSelector | string;
+  containerSelector?: NodeSelector | string;
+};
+
 export type KeyboardTracker = {
   dispose: () => void;
   setFocusedElementByIndex: (index: number | number[]) => boolean;
   setFocusToElement: (element?: FocusableElement | null) => boolean;
   setFocusToElementDataOrPath: (dataOrPath?: Partial<ElementData> | ElementPath | null) => boolean;
   refresh: () => void;
-  getNavigationOptions: () => ReturnType<ElementMapper['getNavigationOptions']>;
+  getNavigationOptions: () => NavigationOptions;
   getFocusedElement: () => Element | null;
   setKeys: (newKeys: Partial<KeyboardTrackerOptions['keys']>) => KeyboardTrackerOptions['keys'];
 };
@@ -53,19 +61,11 @@ export type ElementData = {
   type: 'untracked' | 'root' | 'container' | 'focusable';
   index: number;
   element?: HTMLElement;
-  childContainers?: ElementData[];
-  focusable?: ElementData[];
+  containerElements?: ElementData[];
+  focusableElements?: ElementData[];
 };
 
 export type ElementPath = ElementData[];
-
-export type NodeSelector = (parent: HTMLElement, path: ElementPath) => NodeList;
-export type Selector = (parent: HTMLElement, path: ElementPath) => HTMLElement[];
-
-export type Selectors = {
-  containerElements?: Selector;
-  focusableElements: Selector;
-};
 
 export type ElementMapper = {
   getPath: (element: HTMLElement) => ElementPath | null;
