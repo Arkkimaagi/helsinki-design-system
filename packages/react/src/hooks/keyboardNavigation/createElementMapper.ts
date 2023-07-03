@@ -6,6 +6,7 @@ import {
   ElementPath,
   Selectors,
   ElementMapper,
+  getArrayItemAtIndex,
 } from './index';
 
 const untrackedElementData: ElementData = {
@@ -36,7 +37,7 @@ function isChild(parent: HTMLElement, assumedChildren: Array<NodeOrElement | nul
 }
 
 function findElementPath(searchPath: ElementPath, target: HTMLElement): ElementPath {
-  const startPoint = searchPath.at(-1);
+  const startPoint = getArrayItemAtIndex(searchPath, -1);
   if (!startPoint || !startPoint.element || !isChild(startPoint.element, [target])) {
     return [{ ...untrackedElementData }];
   }
@@ -57,7 +58,7 @@ function findElementPath(searchPath: ElementPath, target: HTMLElement): ElementP
         return findElementPath([...searchPath, data], target);
       })
       .filter((result) => {
-        const data = result.at(-1);
+        const data = getArrayItemAtIndex(result, -1);
         return data && data.element === target;
       });
     return childHit.length ? childHit[0] : [{ ...untrackedElementData }];
@@ -66,7 +67,7 @@ function findElementPath(searchPath: ElementPath, target: HTMLElement): ElementP
 }
 
 function addMappedElements(path: ElementPath, selectors: Selectors) {
-  const targetData = path.at(-1);
+  const targetData = getArrayItemAtIndex(path, -1);
   const element = targetData && targetData.element;
   if (!element) {
     return;
@@ -137,7 +138,7 @@ export function returnValidElementData(data?: ElementData | null) {
 }
 
 export function isValidPath(elementPath: ElementPath): boolean {
-  return !!returnValidElementData(elementPath.at(-1));
+  return !!returnValidElementData(getArrayItemAtIndex(elementPath, -1));
 }
 
 export function createElementMapper(root: HTMLElement, selectors: Selectors): ElementMapper {
@@ -148,7 +149,7 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
       return null;
     }
     const path = findElementPath([rootData], element);
-    const data = path.at(-1);
+    const data = getArrayItemAtIndex(path, -1);
     if (!data || data.index === -1) {
       return null;
     }
@@ -201,11 +202,10 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
     if (!indexes.length) {
       return null;
     }
-    console.log('Indexes', indexes);
     const copy = [...indexes];
     const last = copy.pop() as number;
     const parentPath = getPathToContainerByIndexes(copy);
-    const parent = returnValidElementData(parentPath.at(-1));
+    const parent = returnValidElementData(getArrayItemAtIndex(parentPath, -1));
     if (!parent) {
       return null;
     }
@@ -229,7 +229,7 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
     // parent is the container holding the focusable
     // grandparent is the container holding parent and it siblings
     // related focusables are parent's and its sibling container's focusables.
-    const containerParent = pathToFocusable.at(-3) || pathToFocusable.at(-2);
+    const containerParent = getArrayItemAtIndex(pathToFocusable, -3) || getArrayItemAtIndex(pathToFocusable, -2);
     if (!containerParent) {
       return [];
     }
@@ -241,15 +241,15 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
   ): { levelUp?: FocusableElement; levelDown?: FocusableElement } => {
     // if parent container has childContainers and there are focusables, then user can navigate down
     // if parent's parent has focusables (other than current), then user can navigate up.
-    const parent = pathToFocusable.at(-2);
+    const parent = getArrayItemAtIndex(pathToFocusable, -2);
     if (!parent) {
       return {};
     }
     const firstContainerDown = parent.containerElements && parent.containerElements[0];
     const levelDown = firstContainerDown && getRelatedFocusableElements(firstContainerDown)[0];
 
-    const grandParent = pathToFocusable.at(-3);
-    const closestFocusableUp = grandParent && grandParent.focusableElements && grandParent.focusableElements.at(-1);
+    const grandParent = getArrayItemAtIndex(pathToFocusable, -3);
+    const closestFocusableUp = grandParent && getArrayItemAtIndex(grandParent.focusableElements, -1);
 
     return {
       levelDown,
@@ -262,7 +262,7 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
     if (!path) {
       return {};
     }
-    const data = path.at(-1);
+    const data = getArrayItemAtIndex(path, -1);
     if (!data || !data.type || data.index === -1 || data.type !== 'focusable') {
       return {};
     }
@@ -317,8 +317,6 @@ export function createElementMapper(root: HTMLElement, selectors: Selectors): El
       disposeData(rootData);
       rootData = mapAllElements(root, selectors);
     },
-    getRootData: () => {
-      return rootData;
-    },
+    getRootData: () => rootData,
   };
 }

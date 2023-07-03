@@ -15,6 +15,7 @@ function useFocusTrapper(props: FocusTrapperProps) {
     }
     tracker.current.registerTrackerElement(position, element);
   };
+
   const firstTrapperRefListener: RefListener = useCallback(
     (observedElement: HTMLElement | null) => {
       firstTrapperRef.current = observedElement;
@@ -23,6 +24,7 @@ function useFocusTrapper(props: FocusTrapperProps) {
     },
     [tracker],
   );
+
   const lastTrapperRefListener: RefListener = useCallback(
     (observedElement: HTMLElement | null) => {
       lastTrapperRef.current = observedElement;

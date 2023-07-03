@@ -5,10 +5,12 @@ import useMutationObserver from './useMutationObserver';
 import { KeyboardTracker, KeyboardTrackerProps } from './keyboardNavigation';
 
 type RefListener = (element: HTMLElement | null) => React.MutableRefObject<HTMLElement | null>;
+
 type KeyboardTrackerHookProps = KeyboardTrackerProps & {
   autoUpdateOnMutation?: boolean;
   autoUpdateOnRender?: boolean;
 };
+
 function useKeyboardNavigation(props: KeyboardTrackerHookProps = {}) {
   const { autoUpdateOnMutation, autoUpdateOnRender, ...trackerProps } = props;
   const observedElementRef = useRef<HTMLElement | null>(null);

@@ -77,3 +77,11 @@ export type ElementMapper = {
   refresh: () => void;
   getRootData: () => ElementData | null;
 };
+
+export function getArrayItemAtIndex<T = unknown>(array: T[] | null | undefined, index: number): T | undefined {
+  if (!array || !array.length) {
+    return undefined;
+  }
+  const targetIndex = index < 0 ? array.length + index : index;
+  return array[targetIndex];
+}

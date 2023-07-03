@@ -7,6 +7,7 @@ import {
   ElementMapper,
   ElementPath,
   KeyboardTrackerOptions,
+  getArrayItemAtIndex,
 } from '.';
 
 function forceFocusToElement(element?: NodeOrElement) {
@@ -36,7 +37,7 @@ export function createFocusTracker(
     if (!path) {
       pathToCurrentFocusedElement = null;
     } else {
-      const lastItemOnPath = path.at(-1);
+      const lastItemOnPath = getArrayItemAtIndex(path, -1);
       if (!lastItemOnPath || !returnValidElementData(lastItemOnPath) || lastItemOnPath.type !== 'focusable') {
         pathToCurrentFocusedElement = null;
       } else {
@@ -50,7 +51,7 @@ export function createFocusTracker(
     if (!pathToCurrentFocusedElement) {
       return null;
     }
-    const data = returnValidElementData(pathToCurrentFocusedElement.at(-1));
+    const data = returnValidElementData(getArrayItemAtIndex(pathToCurrentFocusedElement, -1));
     return (data && data.element) || null;
   };
 
@@ -67,7 +68,7 @@ export function createFocusTracker(
   const getElemenData = (element: NodeOrElement | null) => {
     const path = elementMapper.getPath(element as HTMLElement);
     if (path && isValidPath(path)) {
-      return path.at(-1);
+      return getArrayItemAtIndex(path, -1);
     }
     return null;
   };
@@ -76,7 +77,7 @@ export function createFocusTracker(
     if (!pathToCurrentFocusedElement) {
       return false;
     }
-    const data = pathToCurrentFocusedElement.at(-1) as ElementData;
+    const data = getArrayItemAtIndex(pathToCurrentFocusedElement, -1) as ElementData;
     return forceFocusToElement(data.element);
   };
 
@@ -90,7 +91,7 @@ export function createFocusTracker(
     if (!container) {
       return false;
     }
-    const focusable = elementMapper.getRelatedFocusableElements(container).at(index);
+    const focusable = getArrayItemAtIndex(elementMapper.getRelatedFocusableElements(container), index);
     const path = focusable && elementMapper.getPath(focusable);
     const isValid = storeValidPathToFocusedElement(path);
     if (isValid) {
@@ -127,7 +128,7 @@ export function createFocusTracker(
       return elementMapper.getRelatedFocusableElements(container).length > 0;
     },
     getCurrentFocusedElementData: () => {
-      return pathToCurrentFocusedElement ? pathToCurrentFocusedElement.at(-1) : null;
+      return getArrayItemAtIndex(pathToCurrentFocusedElement, -1);
     },
     isTrackedElement: (el: NodeOrElement | null) => {
       if (!el) {

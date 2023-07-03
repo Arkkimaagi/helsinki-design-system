@@ -7,6 +7,7 @@ export type FocusTrapperProps = {
   manualControls?: boolean;
 };
 export type Position = 'first' | 'last';
+
 export function createFocusTrapper({
   firstTrapperElement,
   lastTrapperElement,
@@ -18,13 +19,7 @@ export function createFocusTrapper({
     first: firstTrapperElement,
     last: lastTrapperElement,
   };
-  const disableElementFocus = (element?: HTMLElement) => {
-    if (!element) {
-      return;
-    }
-    element.setAttribute('tabindex', '-1');
-    element.setAttribute('disabled', 'true');
-  };
+
   const enableElementFocus = (element?: HTMLElement) => {
     if (!element) {
       return;
@@ -32,14 +27,25 @@ export function createFocusTrapper({
     element.setAttribute('tabindex', '0');
     element.removeAttribute('disabled');
   };
-  const disableTracking = () => {
-    disableElementFocus(elements.first);
-    disableElementFocus(elements.last);
-  };
+
   const enableTracking = () => {
     enableElementFocus(elements.first);
     enableElementFocus(elements.last);
   };
+
+  const disableElementFocus = (element?: HTMLElement) => {
+    if (!element) {
+      return;
+    }
+    element.setAttribute('tabindex', '-1');
+    element.setAttribute('disabled', 'true');
+  };
+
+  const disableTracking = () => {
+    disableElementFocus(elements.first);
+    disableElementFocus(elements.last);
+  };
+
   const getElementPosition = (element?: HTMLElement | Node | EventTarget | null): Position | undefined => {
     if (!element) {
       return undefined;
@@ -52,6 +58,7 @@ export function createFocusTrapper({
     }
     return undefined;
   };
+
   const listener = (focusEvent: FocusEvent) => {
     const position = getElementPosition(focusEvent.target as HTMLElement);
     if (!position) {
@@ -64,12 +71,14 @@ export function createFocusTrapper({
       disableTracking();
     }
   };
+
   const addFocusListener = (element?: HTMLElement) => {
     if (!element) {
       return;
     }
     element.addEventListener('focus', listener);
   };
+
   const removeFocusListener = (element?: HTMLElement) => {
     if (!element) {
       return;
